@@ -2,6 +2,8 @@ import debug from "debug";
 import express from "express";
 import http from "http";
 import { Server as SocketIO } from "socket.io";
+import { restHandler } from "./restHandler";
+import bodyParser from "body-parser";
 
 type UserToFollow = {
   socketId: string;
@@ -27,6 +29,10 @@ const port =
   process.env.PORT || (process.env.NODE_ENV !== "development" ? 80 : 3002); // default port to listen
 
 app.use(express.static("public"));
+
+app.use(bodyParser.raw());
+
+app.use("/scene/:id", restHandler("scene"));
 
 app.get("/", (req, res) => {
   res.send("Excalidraw collaboration server is up :)");
