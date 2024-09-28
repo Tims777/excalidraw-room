@@ -30,9 +30,10 @@ const port =
 
 app.use(express.static("public"));
 
-app.use(bodyParser.raw());
+app.use(bodyParser.raw({ limit: "10mb" }));
 
-app.use("/scene/:id", restHandler("scene"));
+app.use("/scene/*", restHandler("scene"));
+app.use("/file/*", restHandler("file"));
 
 app.get("/", (req, res) => {
   res.send("Excalidraw collaboration server is up :)");
