@@ -1,14 +1,11 @@
-import type { RequestHandler } from "express";
+import type { Request, RequestHandler, Response } from "express";
+import { Repository } from "./repository";
 
-interface Resource {
-    hash: string;
-    data: ArrayBuffer;
-}
+type AsyncHandler = (req: Request, res: Response) => Promise<void>;
 
-export function restHandler(_resName: string): RequestHandler {
-    const resources: Record<string, Resource> = {};
+export function restHandler(repo: Repository): RequestHandler {
 
-    const _put: RequestHandler = (req, res, next) => {
+    const _put: AsyncHandler = async (req, res) => {
         const resId = req.params[0];
         const newData = req.body as ArrayBuffer;
         const newHash = req.header("ETag");
@@ -19,75 +16,72 @@ export function restHandler(_resName: string): RequestHandler {
             return;
         }
 
-        if (resources[resId] && resources[resId].hash != oldHash) {
+        const resource = await repo.get(resId);
+        if (resource && resource.hash != oldHash) {
             res.status(409).send("Hash mismatch. Update denied.");
             return;
         }
 
-        resources[resId] = {
+        await repo.put(resId, {
             hash: newHash,
             data: newData,
-        };
+        });
 
         res.status(200).send(`Resource with ID ${resId} has been upserted.`);
-        next();
     };
 
-    const _get: RequestHandler = (req, res, next) => {
+    const _get: AsyncHandler = async (req, res) => {
         const resId = req.params[0];
         const oldHash = req.header("If-None-Match");
 
-        if (!resources[resId]) {
+        const resource = await repo.get(resId);
+        if (!resource) {
             res.status(404).send("Not found.");
             return;
         }
 
-        if (resources[resId] && resources[resId].hash == oldHash) {
+        if (resource.hash == oldHash) {
             res.status(304).send("Not modified.");
             return;
         }
 
-        // TODO: Respect If-None-Match header
-
-        const resource = resources[resId];
         res.header("ETag", resource.hash).header("Content-Type", "application/octet-stream");
         res.status(200).send(resource.data);
-        next();
     };
 
-    const _options: RequestHandler = (req, res, next) => {
-        const resId = req.params[0];
-        delete resources[resId];
+    const _options: AsyncHandler = async (_req, res) => {
         res.status(200).end();
-        next();
     };
 
-    const _delete: RequestHandler = (req, res, next) => {
+    const _delete: AsyncHandler = async (req, res) => {
         const resId = req.params[0];
-        delete resources[resId];
+        await repo.delete(resId);
         res.status(200).end();
-        next();
     };
 
-    return (req, res, next) => {
-        res.header("Access-Control-Allow-Origin", process.env.CORS_ORIGIN || "*");
-        res.header("Access-Control-Allow-Methods", "GET, PUT, DELETE, OPTIONS");
-        res.header("Access-Control-Allow-Headers", "Content-Type, ETag, If-Match, If-None-Match");
-        switch (req.method) {
-            case "GET":
-                _get(req, res, next);
-                break;
-            case "PUT":
-                _put(req, res, next);
-                break;
-            case "OPTIONS":
-                _options(req, res, next);
-                break;
-            case "DELETE":
-                _delete(req, res, next);
-                break;
-            default:
-                next();
+    return async (req, res, next) => {
+        try {
+            res.header("Access-Control-Allow-Origin", process.env.CORS_ORIGIN || "*");
+            res.header("Access-Control-Allow-Methods", "GET, PUT, DELETE, OPTIONS");
+            res.header("Access-Control-Allow-Headers", "Content-Type, ETag, If-Match, If-None-Match");
+            switch (req.method) {
+                case "GET":
+                    await _get(req, res);
+                    break;
+                case "PUT":
+                    await _put(req, res);
+                    break;
+                case "OPTIONS":
+                    await _options(req, res);
+                    break;
+                case "DELETE":
+                    await _delete(req, res);
+                    break;
+                default:
+                    next();
+            }
+        } catch(err) {
+            next(err);
         }
     };
 }

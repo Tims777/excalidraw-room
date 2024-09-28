@@ -4,6 +4,7 @@ import http from "http";
 import { Server as SocketIO } from "socket.io";
 import { restHandler } from "./restHandler";
 import bodyParser from "body-parser";
+import { FileStorage } from "./repository";
 
 type UserToFollow = {
   socketId: string;
@@ -32,8 +33,13 @@ app.use(express.static("public"));
 
 app.use(bodyParser.raw({ limit: "10mb" }));
 
-app.use("/scene/*", restHandler("scene"));
-app.use("/file/*", restHandler("file"));
+const dataDir = process.env.DATA_DIR || "./data";
+
+const scenes = new FileStorage(`${dataDir}/scenes`);
+app.use("/scene/*", restHandler(scenes));
+
+const files = new FileStorage(`${dataDir}/files`);
+app.use("/file/*", restHandler(files));
 
 app.get("/", (req, res) => {
   res.send("Excalidraw collaboration server is up :)");
