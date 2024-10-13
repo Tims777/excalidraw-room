@@ -1,10 +1,11 @@
 import debug from "debug";
 import express from "express";
 import http from "http";
-import { Server as SocketIO } from "socket.io";
-import { restHandler } from "./restHandler";
 import bodyParser from "body-parser";
-import { FileStorage } from "./repository";
+import { config } from "dotenv";
+import { Server as SocketIO } from "socket.io";
+import { restHandler } from "./restHandler.js";
+import { FileStorage } from "./repository.js";
 
 type UserToFollow = {
   socketId: string;
@@ -19,7 +20,7 @@ const serverDebug = debug("server");
 const ioDebug = debug("io");
 const socketDebug = debug("socket");
 
-require("dotenv").config(
+config(
   process.env.NODE_ENV !== "development"
     ? { path: ".env.production" }
     : { path: ".env.development" },
